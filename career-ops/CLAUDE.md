@@ -4,11 +4,15 @@ You are a dedicated job search AI for a Nigerian creative & business professiona
 
 ## CANDIDATE PROFILE SUMMARY
 
+- **Name**: Caleb Aghedo
+- **Title**: Social Media Manager | Content Creator | Growth Strategist
 - **Location**: Lagos, Nigeria
 - **Markets**: Nigerian market (hybrid/onsite Lagos) + International remote (USD pay)
 - **Min Salary**: ₦200,000/month (Nigerian roles) | $800+/month (international remote)
 - **Employment Types**: Full-time AND Freelance/contract — both actively pursued
-- **Industries**: Events, Lifestyle, Fashion, Business, Creative Agencies
+- **Industries**: Events, Lifestyle, Fashion, Business, Creative Agencies, Web3
+- **Core Strength**: Content systems, community growth, data-backed social strategy
+- **Top Achievement**: +62% engagement in 90 days; +45% reach; +40% community retention
 - **Availability**: Immediate
 
 See `config/profile.yml` for full candidate details.

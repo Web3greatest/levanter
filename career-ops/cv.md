@@ -1,63 +1,89 @@
-# [YOUR FULL NAME]
+# Caleb Aghedo
 
-**Email:** [your.email@gmail.com] | **Phone:** +234-XXX-XXXX-XXX | **Location:** Lagos, Nigeria  
-**LinkedIn:** [linkedin.com/in/yourprofile] | **Portfolio:** [yourwebsite.com]
+**Social Media Manager | Content Creator | Growth Strategist**
+
+Lagos, Nigeria | aghedocaleb2003@gmail.com | linkedin.com/in/calebaghedo
 
 ---
 
-## PROFESSIONAL SUMMARY
+## PERSONAL BRANDING STATEMENT
 
-> **IMPORTANT: Replace this entire section with your actual summary.**
-> 
-> Example: "Results-driven Events and Brand Manager with X years of experience in [industries]. 
-> Proven track record of [key achievement]. Expertise in [top skills]. 
-> Seeking [remote/hybrid] opportunities in [target industries]."
+I help founders, Web3 brands, and mission-driven organizations grow through data-backed content, strategic storytelling, and community-led digital experiences. I specialize in turning complex ideas into engaging, high-retention content that drives visibility, trust, and measurable traction.
 
 ---
 
 ## CORE SKILLS
 
-> **Replace with your actual skills:**
-> - Event Planning & Management
-> - Brand Management & PR
-> - [Skill 3]
-> - [Skill 4]
-> - [Skill 5]
-> - [Skill 6]
+**Strategy & Growth:** Social Media Management · Growth Strategy · Content Systems · Brand Storytelling · Community Management · Trend Research
+
+**Content & Creative:** Short-Form Content · Copywriting · Web3 Content · Visual Content Design
+
+**Analytics:** Analytics & Reporting · Meta Business Suite · X Analytics · Data-Driven Content Calendars
+
+**Tools:** Canva · CapCut · Notion · Trello
 
 ---
 
 ## PROFESSIONAL EXPERIENCE
 
-### [Job Title] | [Company Name] | [City, Nigeria] | [Month Year – Present / Month Year]
+### Social Media Manager
+**Delabz (Web3)** | Lagos, Nigeria | Sept 2024 – Present
 
-- [Achievement or responsibility — use numbers where possible]
-- [Achievement or responsibility]
-- [Achievement or responsibility]
+- Built content systems that increased cross-platform engagement by **62% within 90 days**
+- Produced protocol breakdowns, founder narratives, and industry commentary that boosted profile visibility
+- Managed daily execution across X (Twitter), LinkedIn, and community channels
+- Developed data-driven content calendars that improved consistency and audience retention
 
-### [Job Title] | [Company Name] | [City] | [Month Year – Month Year]
+### Social Media Manager
+**Just Breathe Asthma Foundation** | Lagos, Nigeria | Jan 2024 – Present
 
-- [Achievement or responsibility]
-- [Achievement or responsibility]
+- Boosted monthly reach by **45%** using educational and advocacy-driven content
+- Strengthened brand trust through health-sensitive, audience-aware communication
+- Designed visual content that increased engagement on awareness campaigns
+
+### Community Manager & Social Media Executive
+**GILD Members** | Nov 2024 – Mar 2025
+
+- Managed and moderated community platforms, increasing member retention by **40%**
+- Created weekly analytics reports to adjust content and engagement strategies
+- Maintained a healthy digital environment through active moderation and community rules enforcement
+
+### National Coordinator / Former Program Director
+**The Emerge Club** | Mar 2023 – 2025
+
+- Led national digital campaigns, improving student participation by **30%**
+- Produced content and programs that expanded online engagement across chapters nationwide
+
+### Public Relations Officer
+**NAMMES UNILAG** | Nov 2024 – 2025
+
+- Streamlined communications for **500+ students** through timely and clear digital updates
+- Managed organizational digital presence and coordinated member-facing announcements
 
 ---
 
 ## EDUCATION
 
-**[Degree]** — [Institution Name], [City] | [Year]
+University of Lagos (UNILAG) | Lagos, Nigeria
+*(Member: NAMMES — Nigerian Association of Mass Media & Entertainment Students)*
 
 ---
 
-## CERTIFICATIONS & TRAINING
+## INDUSTRIES SERVED
 
-- [Certification Name] — [Issuing Body] | [Year]
+- Web3 / Blockchain
+- Non-profit & Health Advocacy
+- Student Organizations & Community Building
+- Events & Brand Activations
 
 ---
 
-## NOTABLE PROJECTS / PORTFOLIO
+## NOTABLE ACHIEVEMENTS
 
-- **[Project Name]**: [Brief description and outcome]
-- **[Project Name]**: [Brief description and outcome]
+- **+62% engagement** in 90 days for a Web3 brand through content system redesign
+- **+45% monthly reach** for a health nonprofit through strategic content
+- **+40% community retention** through structured moderation and engagement strategy
+- **+30% student participation** via national digital campaigns
 
 ---
 
