@@ -1,0 +1,165 @@
+# Candidate Profile — Caleb Aghedo
+
+personal:
+  name: "Caleb Aghedo"
+  email: "aghedocaleb2003@gmail.com"
+  phone: ""   # Add your phone number
+  location: "Lagos, Nigeria"
+  linkedin: "linkedin.com/in/calebaghedo"
+  portfolio: ""  # Add if you have one
+
+# Work preferences
+preferences:
+  employment_types:
+    - full-time
+    - freelance
+    - contract
+
+  work_modes:
+    - remote (international)
+    - hybrid (Lagos)
+    - fully remote (Nigeria)
+
+  salary:
+    naira_minimum: 200000           # ₦200,000/month
+    usd_minimum: 800                # $800/month international
+    naira_target: 350000            # Ideal Nigerian salary
+    usd_target: 1500                # Ideal international remote salary
+    freelance_min_per_project: 50000   # ₦50k minimum per project
+    freelance_retainer_min: 80000      # ₦80k/month minimum for retainers
+
+  notice_period: "Immediate"
+  priority: "both"   # freelance | fulltime | both
+
+# Target industries (ranked by preference)
+industries:
+  - Events & Entertainment
+  - Fashion & Lifestyle
+  - Creative Agencies & Marketing
+  - Business & Startups
+  - Media & Publishing
+  - Web3 & Tech (existing strength)
+  - Health & Advocacy (existing strength)
+
+# Target roles — based on actual skills
+target_roles:
+  fulltime:
+    - Social Media Manager
+    - Content Manager
+    - Digital Marketing Manager
+    - Growth Marketing Manager
+    - Brand & Communications Manager
+    - Community Manager
+    - Content Strategist
+
+  freelance:
+    - Social Media Management Retainer (₦80k-₦150k/month per client)
+    - Content Creation & Strategy Package
+    - Brand Launch Content Package
+    - Community Setup & Management
+    - Social Media Audit & Roadmap
+    - Ghostwriting (LinkedIn, newsletters, founder content)
+    - Event Social Media Coverage & Live Content
+
+# Core skills (for cover letter and evaluation matching)
+skills:
+  primary:
+    - Social Media Management
+    - Content Strategy & Creation
+    - Growth Strategy
+    - Community Management
+    - Brand Storytelling
+    - Copywriting
+
+  secondary:
+    - Short-Form Video Content
+    - Web3 / Blockchain Content
+    - PR & Communications
+    - Analytics & Reporting
+    - Visual Content Design
+
+  tools:
+    - Canva
+    - CapCut
+    - Meta Business Suite
+    - X (Twitter) Analytics
+    - Notion
+    - Trello
+
+  languages:
+    - English (Fluent)
+
+# Experience
+experience:
+  total_years: "2+ years"
+  social_media: "2 years"
+  community_management: "1 year"
+  content_creation: "2 years"
+  web3: "1 year"
+
+# Key proof points (use in cover letters)
+achievements:
+  - "+62% cross-platform engagement in 90 days (Delabz)"
+  - "+45% monthly reach for Just Breathe Asthma Foundation"
+  - "+40% community retention at GILD Members"
+  - "+30% student participation via national digital campaigns (The Emerge Club)"
+  - "Managed communications for 500+ students (NAMMES UNILAG)"
+
+# Geography preferences
+geography:
+  lagos_areas:
+    - Victoria Island
+    - Lekki
+    - Lagos Island
+    - Ikoyi
+    - Yaba (tech hub)
+    - Ikeja
+  international: true
+
+# Job boards to target
+job_boards:
+  nigerian:
+    - https://www.jobberman.com
+    - https://www.myjobmag.com
+    - https://ngcareers.com
+    - https://www.linkedin.com/jobs
+    - https://www.hotnigerianjobs.com
+  international_remote:
+    - https://weworkremotely.com
+    - https://remoteok.com
+    - https://remote.co/remote-jobs
+    - https://dynamitejobs.com
+    - https://www.contra.com
+  freelance:
+    - https://www.upwork.com
+    - https://www.fiverr.com
+    - https://www.asuqu.com
+
+# Companies to target (strong alignment with skills)
+target_companies:
+  nigerian_events_fashion:
+    - BellaNaija
+    - Pulse Nigeria
+    - Fashion Republic
+    - Glam Squad
+    - The Playhouse Lagos
+    - Filmhouse Cinemas
+    - Terra Kulture
+  nigerian_brands_agencies:
+    - Wild Fusion (digital agency)
+    - Noah's Ark Communications
+    - Redwire Africa
+    - X3M Group
+    - StateCraft
+  international_remote:
+    - African fashion/lifestyle brands with digital teams
+    - Web3 projects and DAOs (existing strength)
+    - Global non-profits with Africa focus
+
+# Do NOT apply to
+blacklist:
+  conditions:
+    - below_minimum_salary: true
+    - no_remote_or_lagos_hybrid: false   # Flag but don't auto-reject
+    - unpaid_trial_over_2hrs: true
+    - commission_only_no_base: true
