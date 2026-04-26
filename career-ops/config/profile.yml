@@ -1,0 +1,124 @@
+# Candidate Profile — UPDATE THIS WITH YOUR ACTUAL DETAILS
+
+personal:
+  name: "[YOUR FULL NAME]"
+  email: "[YOUR EMAIL]"
+  phone: "[YOUR PHONE e.g. +234-XXX-XXXX-XXX]"
+  location: "Lagos, Nigeria"
+  linkedin: "[YOUR LINKEDIN URL]"
+  portfolio: "[YOUR PORTFOLIO/WEBSITE URL if any]"
+  instagram: "[YOUR INSTAGRAM if relevant for fashion/events]"
+
+# Work preferences
+preferences:
+  employment_types:
+    - full-time
+    - freelance
+    - contract
+  work_modes:
+    - remote (international)
+    - hybrid (Lagos)
+    - onsite (Lagos)
+
+  # Salary minimums — DO NOT apply below these
+  salary:
+    naira_minimum: 200000          # ₦200,000/month for Nigerian roles
+    usd_minimum: 800               # $800/month for international remote
+    naira_target: 350000           # Ideal Nigerian salary
+    usd_target: 2000               # Ideal international salary
+    freelance_min_per_project: 50000  # ₦50k minimum per project
+
+  notice_period: "Immediate / 2 weeks"
+
+  # Priority: which type of opportunity to chase harder right now
+  priority: "both"  # options: freelance | fulltime | both
+
+# Target industries (ranked by preference)
+industries:
+  - Events & Entertainment
+  - Fashion & Style
+  - Lifestyle & Wellness
+  - Creative Agencies & Marketing
+  - Business & Consulting
+  - Media & Content Creation
+
+# Target roles (fill in based on your actual experience)
+target_roles:
+  fulltime:
+    - "[e.g. Events Coordinator]"
+    - "[e.g. Brand Manager]"
+    - "[e.g. Fashion PR Manager]"
+    - "[e.g. Content Strategist]"
+    - "[e.g. Marketing Manager]"
+  freelance:
+    - "[e.g. Event Planner]"
+    - "[e.g. Stylist]"
+    - "[e.g. Social Media Consultant]"
+    - "[e.g. Content Creator]"
+    - "[e.g. Brand Consultant]"
+
+# Your core skills (fill these in!)
+skills:
+  primary: []     # e.g. [Event Planning, Brand Management, Social Media Marketing]
+  secondary: []   # e.g. [Copywriting, Photography, Client Relations]
+  tools: []       # e.g. [Canva, Microsoft Office, Trello, Notion]
+  languages:
+    - English (Fluent)
+    - Yoruba (Native)  # update as appropriate
+
+# Years of experience
+experience:
+  total_years: "[X] years"
+  events: "[X] years"
+  fashion: "[X] years"
+  marketing: "[X] years"
+
+# Geography
+geography:
+  nigerian_locations:
+    - Lagos Island
+    - Lagos Mainland
+    - Victoria Island
+    - Lekki
+    - Ikoyi
+  international: true   # open to fully remote international roles
+
+# Job boards to scan
+job_boards:
+  nigerian:
+    - https://www.jobberman.com
+    - https://www.myjobmag.com
+    - https://www.hotnigerianjobs.com
+    - https://ngcareers.com
+    - https://www.linkedin.com/jobs  # filter: Nigeria
+  international_remote:
+    - https://remote.co/remote-jobs
+    - https://weworkremotely.com
+    - https://remoteok.com
+    - https://dynamitejobs.com
+    - https://www.contra.com
+  freelance:
+    - https://www.upwork.com
+    - https://www.fiverr.com
+    - https://www.asuqu.com  # Nigerian freelance platform
+    - https://workaholicnigeria.com
+
+# Companies to watch (add specific companies you admire)
+target_companies:
+  nigerian:
+    - "[e.g. Showroom Events]"
+    - "[e.g. House of Lunettes]"
+    - "[e.g. BellaNaija]"
+    - "[e.g. Stanbic IBTC Events]"
+  international:
+    - "[e.g. Vogue Africa]"
+    - "[e.g. African Fashion International]"
+
+# Do NOT apply to
+blacklist:
+  companies: []
+  roles: []
+  conditions:
+    - fully_onsite_outside_lagos: true
+    - below_minimum_salary: true
+    - no_contract_details: false  # flag but don't auto-reject
