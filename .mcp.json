@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "ideabrowser": {
+      "type": "http",
+      "url": "https://www.ideabrowser.com/api/mcp/mcp?key=ib_4caa1ca51a8d1a35d12bba6a581eab87e0cb6f867a37eb7d"
+    }
+  }
+}
