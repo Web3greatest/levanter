@@ -64,11 +64,19 @@ class AIRouter:
         self._openai = None
         self._gemini = None
 
+    @staticmethod
+    def _valid_user_key(key: Optional[str], prefix: str) -> Optional[str]:
+        """Return the key only if it looks like a real key (not masked/placeholder)."""
+        if key and len(key) > 20 and "****" not in key and key.startswith(prefix):
+            return key
+        return None
+
     def _get_anthropic(self, api_key: Optional[str] = None):
-        key = api_key or settings.ANTHROPIC_API_KEY
+        user_key = self._valid_user_key(api_key, "sk-ant-")
+        key = user_key or settings.ANTHROPIC_API_KEY
         if not key:
             return None
-        if api_key:  # per-request client when user provides own key
+        if user_key:
             import anthropic
             return anthropic.AsyncAnthropic(api_key=key)
         if not self._anthropic:
@@ -77,10 +85,11 @@ class AIRouter:
         return self._anthropic
 
     def _get_openai(self, api_key: Optional[str] = None):
-        key = api_key or settings.OPENAI_API_KEY
+        user_key = self._valid_user_key(api_key, "sk-")
+        key = user_key or settings.OPENAI_API_KEY
         if not key:
             return None
-        if api_key:
+        if user_key:
             from openai import AsyncOpenAI
             return AsyncOpenAI(api_key=key)
         if not self._openai:
