@@ -2,6 +2,11 @@ from pydantic_settings import BaseSettings
 from typing import Optional
 import os
 
+_DIR = os.path.dirname(os.path.abspath(__file__))
+_ENV_FILE = os.path.join(_DIR, ".env")
+if not os.path.exists(_ENV_FILE):
+    _ENV_FILE = os.path.join(_DIR, "..", ".env")
+
 
 class Settings(BaseSettings):
     # App
@@ -62,7 +67,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
 
     class Config:
-        env_file = ".env"
+        env_file = _ENV_FILE
         env_file_encoding = "utf-8"
         extra = "ignore"
 

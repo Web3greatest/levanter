@@ -1,59 +1,15 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
-import { getProviders } from '@/lib/api'
-import { Settings, Key, Cpu, User, Save, Eye, EyeOff, CheckCircle } from 'lucide-react'
+import { getProviders, getUserKeys, saveUserKeys } from '@/lib/api'
+import { Settings, Key, Cpu, User, Save, Eye, EyeOff, CheckCircle, Cloud } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 const MODELS = {
   anthropic: ['claude-sonnet-4-6', 'claude-haiku-4-5-20251001', 'claude-opus-4-8'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
-  gemini: ['gemini-1.5-pro', 'gemini-1.5-flash'],
+  gemini: ['gemini-2.0-flash-exp', 'gemini-2.5-pro-exp-03-25'],
   ollama: ['llama3', 'mistral', 'qwen2', 'deepseek-coder'],
-}
-
-function ApiKeyInput({ label, keyName, placeholder }: { label: string; keyName: string; placeholder: string }) {
-  const [value, setValue] = useState('')
-  const [show, setShow] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    const stored = localStorage.getItem(keyName)
-    if (stored) { setValue(stored); setSaved(true) }
-  }, [keyName])
-
-  function save() {
-    if (!value.trim()) { localStorage.removeItem(keyName); setSaved(false); return }
-    localStorage.setItem(keyName, value.trim())
-    setSaved(true)
-    toast.success(`${label} saved`)
-  }
-
-  return (
-    <div className="space-y-1.5">
-      <label className="text-sm text-[#c8c8d0] flex items-center gap-2">
-        {label}
-        {saved && <CheckCircle className="w-3.5 h-3.5 text-green-400" />}
-      </label>
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          <input
-            type={show ? 'text' : 'password'}
-            value={value}
-            onChange={e => { setValue(e.target.value); setSaved(false) }}
-            placeholder={placeholder}
-            className="w-full bg-[#1a1a1b] border border-[#2a2a2b] text-[#e8e8ea] text-sm rounded-lg px-4 py-2.5 outline-none focus:border-brand-500 pr-10"
-          />
-          <button onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8a8a9a] hover:text-white">
-            {show ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          </button>
-        </div>
-        <button onClick={save} className="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 rounded-lg text-sm text-white transition-colors">
-          Save
-        </button>
-      </div>
-    </div>
-  )
 }
 
 export default function SettingsPage() {
@@ -64,17 +20,51 @@ export default function SettingsPage() {
   const [smartModel, setSmartModel] = useState('claude-sonnet-4-6')
   const [deepModel, setDeepModel] = useState('claude-opus-4-8')
 
+  // API key fields
+  const [anthropicKey, setAnthropicKey] = useState('')
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [geminiKey, setGeminiKey] = useState('')
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({})
+  const [keysSaved, setKeysSaved] = useState(false)
+  const [savingKeys, setSavingKeys] = useState(false)
+
   useEffect(() => {
     getProviders().then(setProviders).catch(() => {})
+    getUserKeys().then(data => {
+      if (data.keys?.anthropic) setAnthropicKey(data.keys.anthropic)
+      if (data.keys?.openai) setOpenaiKey(data.keys.openai)
+      if (data.keys?.gemini) setGeminiKey(data.keys.gemini)
+      if (data.preferred_provider) setPreferredProvider(data.preferred_provider)
+    }).catch(() => {})
     const stored = localStorage.getItem('fos_profile')
     if (stored) setProfile(JSON.parse(stored))
     const prov = localStorage.getItem('fos_preferred_provider')
     if (prov) setPreferredProvider(prov)
+    const fm = localStorage.getItem('fos_fast_model'); if (fm) setFastModel(fm)
+    const sm = localStorage.getItem('fos_smart_model'); if (sm) setSmartModel(sm)
+    const dm = localStorage.getItem('fos_deep_model'); if (dm) setDeepModel(dm)
   }, [])
 
   function saveProfile() {
     localStorage.setItem('fos_profile', JSON.stringify(profile))
     toast.success('Profile saved')
+  }
+
+  async function handleSaveKeys() {
+    setSavingKeys(true)
+    try {
+      await saveUserKeys(
+        { anthropic: anthropicKey, openai: openaiKey, gemini: geminiKey },
+        preferredProvider,
+      )
+      setKeysSaved(true)
+      toast.success('API keys saved to your account')
+      setTimeout(() => setKeysSaved(false), 3000)
+    } catch (e: any) {
+      toast.error(e.message || 'Failed to save keys')
+    } finally {
+      setSavingKeys(false)
+    }
   }
 
   function saveModelPrefs() {
@@ -83,6 +73,34 @@ export default function SettingsPage() {
     localStorage.setItem('fos_smart_model', smartModel)
     localStorage.setItem('fos_deep_model', deepModel)
     toast.success('Model preferences saved')
+  }
+
+  const toggleShow = (key: string) => setShowKeys(prev => ({ ...prev, [key]: !prev[key] }))
+
+  function KeyField({ label, value, onChange, placeholder, fieldKey }: {
+    label: string; value: string; onChange: (v: string) => void; placeholder: string; fieldKey: string
+  }) {
+    return (
+      <div className="space-y-1.5">
+        <label className="text-sm text-[#c8c8d0]">{label}</label>
+        <div className="relative">
+          <input
+            type={showKeys[fieldKey] ? 'text' : 'password'}
+            value={value}
+            onChange={e => { onChange(e.target.value); setKeysSaved(false) }}
+            placeholder={placeholder}
+            className="w-full bg-[#1a1a1b] border border-[#2a2a2b] text-[#e8e8ea] text-sm rounded-lg px-4 py-2.5 outline-none focus:border-brand-500 pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => toggleShow(fieldKey)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#5a5a6a] hover:text-white"
+          >
+            {showKeys[fieldKey] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -142,24 +160,36 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2 mb-1">
               <Key className="w-4 h-4 text-brand-400" />
               <h2 className="text-sm font-semibold text-white">API Keys</h2>
+              <span className="ml-auto flex items-center gap-1 text-xs text-[#5a5a6a]">
+                <Cloud className="w-3 h-3" /> Stored in your account
+              </span>
             </div>
-            <p className="text-xs text-[#8a8a9a]">Keys are stored locally in your browser. Never sent to any third party.</p>
+            <p className="text-xs text-[#8a8a9a]">
+              Your own API keys override the shared system key. Keys are stored encrypted in your account and never logged.
+            </p>
 
-            {providers && (
-              <div className="flex flex-wrap gap-2 mb-2">
-                {Object.entries(providers).map(([name, info]: [string, any]) => (
-                  <span key={name} className={`text-xs px-2.5 py-1 rounded-full border ${info.available ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-[#1a1a1b] text-[#5a5a6a] border-[#2a2a2b]'}`}>
-                    {info.available ? '● ' : '○ '}{name}
+            {providers?.providers && (
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(providers.providers).map(([name, available]: [string, any]) => (
+                  <span key={name} className={`text-xs px-2.5 py-1 rounded-full border ${available ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-[#1a1a1b] text-[#5a5a6a] border-[#2a2a2b]'}`}>
+                    {available ? '● ' : '○ '}{name}
                   </span>
                 ))}
               </div>
             )}
 
-            <ApiKeyInput label="Anthropic (Claude)" keyName="ANTHROPIC_API_KEY" placeholder="sk-ant-..." />
-            <ApiKeyInput label="OpenAI (GPT-4)" keyName="OPENAI_API_KEY" placeholder="sk-..." />
-            <ApiKeyInput label="Google Gemini" keyName="GEMINI_API_KEY" placeholder="AIza..." />
-            <ApiKeyInput label="Tavily (Web Search)" keyName="TAVILY_API_KEY" placeholder="tvly-..." />
-            <ApiKeyInput label="Serper (Google Search)" keyName="SERPER_API_KEY" placeholder="..." />
+            <KeyField label="Anthropic (Claude)" value={anthropicKey} onChange={setAnthropicKey} placeholder="sk-ant-..." fieldKey="anthropic" />
+            <KeyField label="OpenAI (GPT-4o)" value={openaiKey} onChange={setOpenaiKey} placeholder="sk-..." fieldKey="openai" />
+            <KeyField label="Google Gemini" value={geminiKey} onChange={setGeminiKey} placeholder="AIza..." fieldKey="gemini" />
+
+            <button
+              onClick={handleSaveKeys}
+              disabled={savingKeys}
+              className="flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 rounded-lg text-sm text-white transition-colors"
+            >
+              {keysSaved ? <CheckCircle className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+              {savingKeys ? 'Saving...' : keysSaved ? 'Saved!' : 'Save API Keys'}
+            </button>
           </section>
 
           {/* Model preferences */}
@@ -181,6 +211,7 @@ export default function SettingsPage() {
                 <option value="openai">OpenAI (GPT)</option>
                 <option value="gemini">Google Gemini</option>
                 <option value="ollama">Ollama (Local)</option>
+                <option value="auto">Auto (best for task)</option>
               </select>
             </div>
 
@@ -209,7 +240,7 @@ export default function SettingsPage() {
           </section>
 
           <p className="text-center text-xs text-[#5a5a6a] pb-4">
-            FOS Platform · Powered by Claude, GPT-4, Gemini · Settings stored locally
+            FOS Platform · Powered by Claude, GPT-4, Gemini
           </p>
         </div>
       </main>

@@ -52,8 +52,10 @@ class ChatRequest(BaseModel):
     complexity: Optional[TaskComplexity] = None
     stream: bool = True
     include_memory: bool = True
-    files: list[str] = []  # uploaded file IDs
-    tools: list[str] = []  # enabled tools
+    files: list[str] = []
+    tools: list[str] = []
+    provider: Optional[str] = None   # "anthropic" | "openai" | "gemini" | "ollama"
+    model: Optional[str] = None      # specific model override
 
 
 class ChatResponse(BaseModel):
@@ -120,10 +122,20 @@ class SearchResult(BaseModel):
 
 
 class AgentRequest(BaseModel):
-    agent: AgentType
-    task: str
+    # Accept both naming conventions from frontend
+    agent: Optional[AgentType] = None
+    agent_type: Optional[AgentType] = None
+    task: Optional[str] = None
+    query: Optional[str] = None
     user_id: str = "default"
     context: dict[str, Any] = {}
+    stream: bool = False
+
+    def effective_agent(self) -> Optional[AgentType]:
+        return self.agent or self.agent_type
+
+    def effective_task(self) -> str:
+        return self.task or self.query or ""
 
 
 class AgentResponse(BaseModel):
@@ -147,12 +159,34 @@ class VoiceResponse(BaseModel):
 
 
 class AuthRequest(BaseModel):
-    username: str
+    email: Optional[str] = None
+    username: Optional[str] = None   # kept for backwards compat
     password: str
+    name: Optional[str] = None       # used during register
+
+    def effective_email(self) -> str:
+        return self.email or self.username or ""
 
 
 class AuthResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
     expires_in: int
+
+
+class UserApiKeys(BaseModel):
+    anthropic: Optional[str] = None
+    openai: Optional[str] = None
+    gemini: Optional[str] = None
+
+
+class ResearchRequest(BaseModel):
+    topic: str
+    depth: int = 3
+
+
+class AnalyzeUrlRequest(BaseModel):
+    url: str

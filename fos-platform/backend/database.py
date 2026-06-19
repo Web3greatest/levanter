@@ -18,11 +18,14 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    username: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     profile: Mapped[dict] = mapped_column(JSON, default=dict)
+    api_keys: Mapped[dict] = mapped_column(JSON, default=dict)   # {"anthropic": "sk-...", ...}
+    preferred_provider: Mapped[str] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

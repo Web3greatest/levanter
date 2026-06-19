@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { Zap, Play, Plus, Trash2, ChevronRight, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { runAgent as apiRunAgent } from '@/lib/api'
 
 const AGENTS = [
   {
@@ -88,14 +89,9 @@ export default function AgentsPage() {
     setLoading(true)
     setResult('')
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/agents/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_type: activeAgent, query: task, stream: false }),
-      })
-      const data = await res.json()
+      const data = await apiRunAgent(activeAgent, task)
       setResult(data.result || data.error || 'No response')
-    } catch { toast.error('Agent failed') }
+    } catch (e: any) { toast.error(e.message || 'Agent failed') }
     finally { setLoading(false) }
   }
 

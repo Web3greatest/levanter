@@ -64,24 +64,39 @@ class AIRouter:
         self._openai = None
         self._gemini = None
 
-    def _get_anthropic(self):
-        if not self._anthropic and settings.ANTHROPIC_API_KEY:
+    def _get_anthropic(self, api_key: Optional[str] = None):
+        key = api_key or settings.ANTHROPIC_API_KEY
+        if not key:
+            return None
+        if api_key:  # per-request client when user provides own key
             import anthropic
-            self._anthropic = anthropic.AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+            return anthropic.AsyncAnthropic(api_key=key)
+        if not self._anthropic:
+            import anthropic
+            self._anthropic = anthropic.AsyncAnthropic(api_key=key)
         return self._anthropic
 
-    def _get_openai(self):
-        if not self._openai and settings.OPENAI_API_KEY:
+    def _get_openai(self, api_key: Optional[str] = None):
+        key = api_key or settings.OPENAI_API_KEY
+        if not key:
+            return None
+        if api_key:
             from openai import AsyncOpenAI
-            self._openai = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+            return AsyncOpenAI(api_key=key)
+        if not self._openai:
+            from openai import AsyncOpenAI
+            self._openai = AsyncOpenAI(api_key=key)
         return self._openai
 
-    def _get_gemini(self):
-        if not self._gemini and settings.GEMINI_API_KEY:
-            import google.generativeai as genai
-            genai.configure(api_key=settings.GEMINI_API_KEY)
+    def _get_gemini(self, api_key: Optional[str] = None):
+        key = api_key or settings.GEMINI_API_KEY
+        if not key:
+            return None
+        import google.generativeai as genai
+        genai.configure(api_key=key)
+        if not api_key:
             self._gemini = genai
-        return self._gemini
+        return genai
 
     def _format_messages(self, messages: list[dict]) -> list[dict]:
         """Normalize messages to {role, content} format."""
@@ -99,8 +114,8 @@ class AIRouter:
     # ── Anthropic ──────────────────────────────────────────────────────────────
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
-    async def _call_anthropic(self, messages: list[dict], model: str, max_tokens: int = 4096) -> str:
-        client = self._get_anthropic()
+    async def _call_anthropic(self, messages: list[dict], model: str, max_tokens: int = 4096, api_key: Optional[str] = None) -> str:
+        client = self._get_anthropic(api_key)
         if not client:
             raise ValueError("Anthropic API key not configured")
 
@@ -115,14 +130,16 @@ class AIRouter:
         )
         return response.content[0].text
 
-    async def _stream_anthropic(self, messages: list[dict], model: str, max_tokens: int = 4096) -> AsyncIterator[str]:
-        client = self._get_anthropic()
+    async def _stream_anthropic(self, messages: list[dict], model: str, max_tokens: int = 4096, api_key: Optional[str] = None) -> AsyncIterator[str]:
+        client = self._get_anthropic(api_key)
         if not client:
             raise ValueError("Anthropic API key not configured")
 
         system = self._extract_system(messages)
         conversation = [m for m in messages if m["role"] != "system"]
 
+        system = self._extract_system(messages)
+        conversation = [m for m in messages if m["role"] != "system"]
         async with client.messages.stream(
             model=model,
             max_tokens=max_tokens,
@@ -135,8 +152,8 @@ class AIRouter:
     # ── OpenAI ─────────────────────────────────────────────────────────────────
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
-    async def _call_openai(self, messages: list[dict], model: str, max_tokens: int = 4096) -> str:
-        client = self._get_openai()
+    async def _call_openai(self, messages: list[dict], model: str, max_tokens: int = 4096, api_key: Optional[str] = None) -> str:
+        client = self._get_openai(api_key)
         if not client:
             raise ValueError("OpenAI API key not configured")
 
@@ -147,8 +164,8 @@ class AIRouter:
         )
         return response.choices[0].message.content
 
-    async def _stream_openai(self, messages: list[dict], model: str, max_tokens: int = 4096) -> AsyncIterator[str]:
-        client = self._get_openai()
+    async def _stream_openai(self, messages: list[dict], model: str, max_tokens: int = 4096, api_key: Optional[str] = None) -> AsyncIterator[str]:
+        client = self._get_openai(api_key)
         if not client:
             raise ValueError("OpenAI API key not configured")
 
@@ -225,6 +242,7 @@ class AIRouter:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         max_tokens: int = 4096,
+        user_api_keys: Optional[dict] = None,
     ) -> tuple[str, str]:
         """Complete a conversation. Returns (response_text, model_used)."""
         if complexity is None:
@@ -236,10 +254,13 @@ class AIRouter:
         if model:
             selected_model = model
 
+        # Use user's own key if provided, otherwise fall back to system key
+        keys = user_api_keys or {}
+
         if selected_provider == "anthropic":
-            text = await self._call_anthropic(messages, selected_model, max_tokens)
+            text = await self._call_anthropic(messages, selected_model, max_tokens, keys.get("anthropic"))
         elif selected_provider == "openai":
-            text = await self._call_openai(messages, selected_model, max_tokens)
+            text = await self._call_openai(messages, selected_model, max_tokens, keys.get("openai"))
         elif selected_provider == "gemini":
             text = await self._call_gemini(messages, selected_model)
         else:
@@ -255,6 +276,7 @@ class AIRouter:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         max_tokens: int = 4096,
+        user_api_keys: Optional[dict] = None,
     ) -> AsyncIterator[str]:
         """Stream a completion."""
         if complexity is None:
@@ -266,17 +288,18 @@ class AIRouter:
         if model:
             selected_model = model
 
+        keys = user_api_keys or {}
+
         if selected_provider == "anthropic":
-            async for chunk in self._stream_anthropic(messages, selected_model, max_tokens):
+            async for chunk in self._stream_anthropic(messages, selected_model, max_tokens, keys.get("anthropic")):
                 yield chunk
         elif selected_provider == "openai":
-            async for chunk in self._stream_openai(messages, selected_model, max_tokens):
+            async for chunk in self._stream_openai(messages, selected_model, max_tokens, keys.get("openai")):
                 yield chunk
         elif selected_provider == "ollama":
             async for chunk in self._stream_ollama(messages, selected_model):
                 yield chunk
         else:
-            # Gemini doesn't stream easily — fall back to non-streaming
             text = await self._call_gemini(messages, selected_model)
             yield text
 

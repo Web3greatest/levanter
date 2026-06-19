@@ -1,9 +1,10 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Brain, MessageSquare, Database, FileText, Search, Users, Settings, Zap, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useState } from 'react'
+import { Brain, MessageSquare, Database, FileText, Search, Users, Settings, Zap, ChevronLeft, ChevronRight, LogOut, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
+import { getCurrentUser, logout } from '@/lib/api'
 
 const NAV_ITEMS = [
   { href: '/chat', icon: MessageSquare, label: 'Chat', desc: 'AI conversations' },
@@ -18,6 +19,16 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [user, setUser] = useState<{ name?: string; email?: string } | null>(null)
+
+  useEffect(() => {
+    const u = getCurrentUser()
+    if (u) setUser(u)
+  }, [])
+
+  const initials = user?.name
+    ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : 'F'
 
   return (
     <motion.aside
@@ -64,8 +75,27 @@ export default function Sidebar() {
         })}
       </nav>
 
-      {/* Collapse button */}
-      <div className="px-2 pb-4">
+      {/* User + Logout */}
+      <div className="px-2 pb-2 border-t border-[#2a2a2b] pt-2">
+        {user && !collapsed && (
+          <div className="flex items-center gap-2 px-2 py-2 mb-1">
+            <div className="w-7 h-7 rounded-full bg-brand-600/30 border border-brand-500/30 flex items-center justify-center flex-shrink-0">
+              <span className="text-xs font-semibold text-brand-400">{initials}</span>
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-medium text-[#c8c8d0] truncate">{user.name || 'Founder'}</div>
+              <div className="text-[10px] text-[#5a5a6a] truncate">{user.email}</div>
+            </div>
+          </div>
+        )}
+        <button
+          onClick={logout}
+          title="Sign out"
+          className="w-full flex items-center gap-2 px-2.5 py-2 text-[#8a8a9a] hover:text-white hover:bg-[#1a1a1b] rounded-xl transition-colors text-sm"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span>Sign out</span>}
+        </button>
         <button
           onClick={() => setCollapsed(!collapsed)}
           className="w-full flex items-center justify-center gap-2 px-2 py-2 text-[#8a8a9a] hover:text-white hover:bg-[#1a1a1b] rounded-xl transition-colors text-sm"

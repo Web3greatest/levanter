@@ -3,8 +3,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import { Search, Globe, BookOpen, Zap, Loader, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react'
 import toast from 'react-hot-toast'
-
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+import { deepResearch, analyzeUrl as apiAnalyzeUrl, search as apiSearch } from '@/lib/api'
 
 const RESEARCH_MODES = [
   { id: 'search', label: 'Web Search', icon: '🌐', desc: 'Quick web search with top results' },
@@ -38,12 +37,7 @@ export default function ResearchPage() {
     setResults([])
     setAnalysis('')
     try {
-      const res = await fetch(`${API}/api/search`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, max_results: 8 }),
-      })
-      const data = await res.json()
+      const data = await apiSearch(query, ['web'])
       setResults(data.results || [])
     } catch { toast.error('Search failed') }
     finally { setLoading(false) }
@@ -55,15 +49,10 @@ export default function ResearchPage() {
     setResults([])
     setAnalysis('')
     try {
-      const res = await fetch(`${API}/api/research`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic: query }),
-      })
-      const data = await res.json()
-      setAnalysis(data.analysis || data.result || '')
+      const data = await deepResearch(query)
+      setAnalysis(data.report || data.analysis || '')
       setResults(data.sources || [])
-    } catch { toast.error('Research failed') }
+    } catch (e: any) { toast.error(e.message || 'Research failed') }
     finally { setLoading(false) }
   }
 
@@ -73,14 +62,9 @@ export default function ResearchPage() {
     setResults([])
     setAnalysis('')
     try {
-      const res = await fetch(`${API}/api/analyze-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      })
-      const data = await res.json()
+      const data = await apiAnalyzeUrl(url)
       setAnalysis(data.analysis || data.summary || '')
-    } catch { toast.error('URL analysis failed') }
+    } catch (e: any) { toast.error(e.message || 'URL analysis failed') }
     finally { setLoading(false) }
   }
 

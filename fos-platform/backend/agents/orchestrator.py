@@ -160,6 +160,9 @@ class AgentOrchestrator:
         agent_type: Optional[AgentType] = None,
         tools: list[str] = None,
         stream: bool = False,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        user_api_keys: Optional[dict] = None,
     ) -> dict[str, Any]:
         """Main execution entry point."""
         if tools is None:
@@ -210,17 +213,25 @@ class AgentOrchestrator:
 
         tools_used = [t for t, r in context.items() if r]
 
+        keys = user_api_keys or {}
+
         if stream:
             return {
-                "stream": self.ai.stream(messages, complexity=complexity),
+                "stream": self.ai.stream(
+                    messages, complexity=complexity,
+                    provider=provider, model=model, user_api_keys=keys,
+                ),
                 "agent": selected_agent.value,
                 "tools_used": tools_used,
             }
         else:
-            response, model = await self.ai.complete(messages, complexity=complexity)
+            response, model_used = await self.ai.complete(
+                messages, complexity=complexity,
+                provider=provider, model=model, user_api_keys=keys,
+            )
             return {
                 "response": response,
-                "model": model,
+                "model": model_used,
                 "agent": selected_agent.value,
                 "tools_used": tools_used,
             }

@@ -18,6 +18,14 @@ const AGENT_OPTIONS = [
   { value: 'operations', label: 'Operations', icon: '⚙️', desc: 'Ops & process' },
 ]
 
+const PROVIDER_OPTIONS = [
+  { value: '', label: 'Auto', icon: '⚡', desc: 'Best model for task' },
+  { value: 'anthropic', label: 'Claude', icon: '🔵', desc: 'Anthropic Claude' },
+  { value: 'openai', label: 'ChatGPT', icon: '🟢', desc: 'OpenAI GPT-4o' },
+  { value: 'gemini', label: 'Gemini', icon: '🟡', desc: 'Google Gemini' },
+  { value: 'ollama', label: 'Local', icon: '🖥️', desc: 'Ollama (offline)' },
+]
+
 const QUICK_PROMPTS = [
   "Write a LinkedIn post about my startup journey",
   "Analyze my pitch deck and suggest improvements",
@@ -45,12 +53,10 @@ function MessageBubble({ msg }: { msg: Message }) {
       animate={{ opacity: 1, y: 0 }}
       className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} mb-6`}
     >
-      {/* Avatar */}
       <div className={`w-8 h-8 rounded-xl flex-shrink-0 flex items-center justify-center text-sm font-bold ${isUser ? 'bg-brand-600 text-white' : 'bg-[#1e1e20] text-brand-500 border border-[#2a2a3b]'}`}>
         {isUser ? 'C' : 'F'}
       </div>
 
-      {/* Content */}
       <div className={`max-w-[85%] ${isUser ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         {msg.agent && !isUser && (
           <span className="text-xs text-[#8a8a9a] px-1">
@@ -91,7 +97,9 @@ export default function ChatInterface() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [selectedAgent, setSelectedAgent] = useState('')
+  const [selectedProvider, setSelectedProvider] = useState('')
   const [showAgents, setShowAgents] = useState(false)
+  const [showProviders, setShowProviders] = useState(false)
   const [sessionId] = useState(() => crypto.randomUUID())
   const [streamingContent, setStreamingContent] = useState('')
   const [streamingAgent, setStreamingAgent] = useState('')
@@ -104,6 +112,13 @@ export default function ChatInterface() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingContent])
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = () => { setShowAgents(false); setShowProviders(false) }
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
+  }, [])
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || loading) return
@@ -131,6 +146,7 @@ export default function ChatInterface() {
         message: userMessage,
         session_id: sessionId,
         agent: selectedAgent || undefined,
+        provider: selectedProvider || undefined,
         stream: true,
       })) {
         if (event.type === 'agent') { agent = event.agent; setStreamingAgent(event.agent) }
@@ -156,7 +172,7 @@ export default function ChatInterface() {
       setLoading(false)
       inputRef.current?.focus()
     }
-  }, [input, loading, sessionId, selectedAgent])
+  }, [input, loading, sessionId, selectedAgent, selectedProvider])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -177,6 +193,7 @@ export default function ChatInterface() {
   }
 
   const agentInfo = AGENT_OPTIONS.find(a => a.value === selectedAgent)
+  const providerInfo = PROVIDER_OPTIONS.find(p => p.value === selectedProvider)
 
   return (
     <div className="flex flex-col h-full bg-[#0f0f10]">
@@ -192,40 +209,78 @@ export default function ChatInterface() {
           </div>
         </div>
 
-        {/* Agent selector */}
-        <div className="relative">
-          <button
-            onClick={() => setShowAgents(!showAgents)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-[#1a1a1b] border border-[#2a2a2b] rounded-lg text-sm text-[#c8c8d0] hover:border-brand-500 transition-colors"
-          >
-            <span>{agentInfo?.icon}</span>
-            <span>{agentInfo?.label}</span>
-            <ChevronDown className="w-3 h-3" />
-          </button>
-          <AnimatePresence>
-            {showAgents && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="absolute right-0 top-10 w-56 bg-[#1a1a1b] border border-[#2a2a2b] rounded-xl shadow-2xl z-50 overflow-hidden"
-              >
-                {AGENT_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => { setSelectedAgent(opt.value); setShowAgents(false) }}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#252527] transition-colors ${selectedAgent === opt.value ? 'bg-brand-600/10 text-brand-400' : 'text-[#c8c8d0]'}`}
-                  >
-                    <span className="text-base">{opt.icon}</span>
-                    <div className="text-left">
-                      <div className="font-medium">{opt.label}</div>
-                      <div className="text-xs text-[#8a8a9a]">{opt.desc}</div>
-                    </div>
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+        <div className="flex items-center gap-2">
+          {/* Provider selector */}
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => { setShowProviders(!showProviders); setShowAgents(false) }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1a1a1b] border border-[#2a2a2b] rounded-lg text-xs text-[#c8c8d0] hover:border-brand-500 transition-colors"
+            >
+              <span>{providerInfo?.icon}</span>
+              <span>{providerInfo?.label}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            <AnimatePresence>
+              {showProviders && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="absolute right-0 top-10 w-48 bg-[#1a1a1b] border border-[#2a2a2b] rounded-xl shadow-2xl z-50 overflow-hidden"
+                >
+                  {PROVIDER_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { setSelectedProvider(opt.value); setShowProviders(false) }}
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-[#252527] transition-colors ${selectedProvider === opt.value ? 'bg-brand-600/10 text-brand-400' : 'text-[#c8c8d0]'}`}
+                    >
+                      <span>{opt.icon}</span>
+                      <div className="text-left">
+                        <div className="font-medium text-xs">{opt.label}</div>
+                        <div className="text-[10px] text-[#8a8a9a]">{opt.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Agent selector */}
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => { setShowAgents(!showAgents); setShowProviders(false) }}
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#1a1a1b] border border-[#2a2a2b] rounded-lg text-sm text-[#c8c8d0] hover:border-brand-500 transition-colors"
+            >
+              <span>{agentInfo?.icon}</span>
+              <span>{agentInfo?.label}</span>
+              <ChevronDown className="w-3 h-3" />
+            </button>
+            <AnimatePresence>
+              {showAgents && (
+                <motion.div
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  className="absolute right-0 top-10 w-56 bg-[#1a1a1b] border border-[#2a2a2b] rounded-xl shadow-2xl z-50 overflow-hidden"
+                >
+                  {AGENT_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { setSelectedAgent(opt.value); setShowAgents(false) }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-[#252527] transition-colors ${selectedAgent === opt.value ? 'bg-brand-600/10 text-brand-400' : 'text-[#c8c8d0]'}`}
+                    >
+                      <span className="text-base">{opt.icon}</span>
+                      <div className="text-left">
+                        <div className="font-medium">{opt.label}</div>
+                        <div className="text-xs text-[#8a8a9a]">{opt.desc}</div>
+                      </div>
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 

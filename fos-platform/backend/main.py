@@ -22,7 +22,8 @@ from database import init_db, get_db, User, Conversation, Memory
 from models import (
     ChatRequest, ChatResponse, MemoryItem, MemoryType, UserProfile,
     SearchRequest, AgentRequest, AgentResponse, AgentType,
-    AuthRequest, AuthResponse, VoiceRequest, DocumentInfo
+    AuthRequest, AuthResponse, VoiceRequest, DocumentInfo,
+    UserApiKeys, ResearchRequest, AnalyzeUrlRequest,
 )
 from ai.router import ai_router
 from memory.manager import memory_manager
@@ -49,7 +50,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS + ["*"] if settings.DEBUG else settings.ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -65,15 +66,16 @@ active_sessions: dict[str, list[dict]] = {}
 # ── Auth helpers ───────────────────────────────────────────────────────────────
 
 def _hash_password(password: str) -> str:
-    from passlib.context import CryptContext
-    ctx = CryptContext(schemes=["bcrypt"])
-    return ctx.hash(password)
+    import bcrypt
+    return bcrypt.hashpw(password[:72].encode(), bcrypt.gensalt()).decode()
 
 
 def _verify_password(plain: str, hashed: str) -> bool:
-    from passlib.context import CryptContext
-    ctx = CryptContext(schemes=["bcrypt"])
-    return ctx.verify(plain, hashed)
+    import bcrypt
+    try:
+        return bcrypt.checkpw(plain[:72].encode(), hashed.encode())
+    except Exception:
+        return False
 
 
 def _create_token(user_id: str) -> str:
@@ -91,17 +93,46 @@ def _decode_token(token: str) -> Optional[str]:
         return None
 
 
+async def _get_or_create_default_user(db: AsyncSession) -> User:
+    """Ensure a default user exists for unauthenticated requests."""
+    result = await db.execute(select(User).where(User.id == "default"))
+    user = result.scalar_one_or_none()
+    if not user:
+        user = User(
+            id="default",
+            username="default",
+            email="default@fos.local",
+            name="Default User",
+            hashed_password=_hash_password("changeme"),
+        )
+        db.add(user)
+        await db.commit()
+    return user
+
+
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: AsyncSession = Depends(get_db),
-) -> str:
-    """Returns user_id. For demo, returns 'default' if no auth."""
+) -> User:
+    """Returns full User object. Returns default user if no auth."""
     if not credentials:
-        return "default"
+        return await _get_or_create_default_user(db)
     user_id = _decode_token(credentials.credentials)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
-    return user_id
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    return user
+
+
+async def get_current_user_id(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: AsyncSession = Depends(get_db),
+) -> str:
+    user = await get_current_user(credentials, db)
+    return user.id
 
 
 # ── Core chat endpoints ────────────────────────────────────────────────────────
@@ -110,9 +141,10 @@ async def get_current_user(
 async def chat(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Main chat endpoint (non-streaming)."""
+    user_id = current_user.id
     session_id = request.session_id or str(uuid.uuid4())
     history = active_sessions.get(session_id, [])
 
@@ -124,14 +156,15 @@ async def chat(
         agent_type=request.agent,
         tools=["search_memory"] + (["web_search"] if "web" in request.tools else []),
         stream=False,
+        provider=request.provider,
+        model=request.model,
+        user_api_keys=current_user.api_keys or {},
     )
 
-    # Update session history
     history.append({"role": "user", "content": request.message})
     history.append({"role": "assistant", "content": result["response"]})
-    active_sessions[session_id] = history[-40:]  # keep last 20 turns
+    active_sessions[session_id] = history[-40:]
 
-    # Persist conversation to DB
     conv_id = request.conversation_id or str(uuid.uuid4())
     await _save_conversation(db, user_id, conv_id, history, result.get("model", "unknown"))
 
@@ -148,11 +181,13 @@ async def chat(
 async def chat_stream(
     request: ChatRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     """Streaming chat endpoint — returns Server-Sent Events."""
+    user_id = current_user.id
     session_id = request.session_id or str(uuid.uuid4())
     history = active_sessions.get(session_id, [])
+    user_api_keys = current_user.api_keys or {}
 
     result = await orchestrator.execute(
         query=request.message,
@@ -162,6 +197,9 @@ async def chat_stream(
         agent_type=request.agent,
         tools=["search_memory"],
         stream=True,
+        provider=request.provider,
+        model=request.model,
+        user_api_keys=user_api_keys,
     )
 
     async def event_stream():
@@ -173,7 +211,6 @@ async def chat_stream(
             full_response += chunk
             yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
 
-        # Save after stream completes
         history.append({"role": "user", "content": request.message})
         history.append({"role": "assistant", "content": full_response})
         active_sessions[session_id] = history[-40:]
@@ -194,7 +231,7 @@ async def websocket_chat(
     await websocket.accept()
     session_id = str(uuid.uuid4())
     history: list[dict] = []
-    user_id = "default"
+    current_user = await _get_or_create_default_user(db)
 
     try:
         while True:
@@ -203,7 +240,9 @@ async def websocket_chat(
 
             if msg_type == "auth":
                 user_id = _decode_token(data.get("token", "")) or "default"
-                await websocket.send_json({"type": "auth_ok", "user_id": user_id})
+                result = await db.execute(select(User).where(User.id == user_id))
+                current_user = result.scalar_one_or_none() or await _get_or_create_default_user(db)
+                await websocket.send_json({"type": "auth_ok", "user_id": current_user.id})
                 continue
 
             if msg_type == "message":
@@ -214,12 +253,13 @@ async def websocket_chat(
 
                 result = await orchestrator.execute(
                     query=query,
-                    user_id=user_id,
+                    user_id=current_user.id,
                     db=db,
                     conversation_history=history,
                     agent_type=agent,
                     tools=["search_memory"],
                     stream=True,
+                    user_api_keys=current_user.api_keys or {},
                 )
 
                 await websocket.send_json({"type": "agent", "agent": result["agent"]})
@@ -255,10 +295,10 @@ async def websocket_chat(
 async def list_memories(
     memory_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     mtype = MemoryType(memory_type) if memory_type else None
-    memories = await memory_manager.get_all(db, user_id, mtype)
+    memories = await memory_manager.get_all(db, current_user.id, mtype)
     return [
         {
             "id": m.id,
@@ -276,10 +316,10 @@ async def list_memories(
 async def add_memory(
     item: MemoryItem,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     mem = await memory_manager.add(
-        db, user_id, item.content, item.memory_type,
+        db, current_user.id, item.content, item.memory_type,
         item.metadata, item.tags, item.importance
     )
     return {"id": mem.id, "status": "created"}
@@ -289,9 +329,9 @@ async def add_memory(
 async def delete_memory(
     memory_id: str,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    await memory_manager.delete_memory(db, memory_id, user_id)
+    await memory_manager.delete_memory(db, memory_id, current_user.id)
     return {"status": "deleted"}
 
 
@@ -299,9 +339,9 @@ async def delete_memory(
 async def search_memory(
     q: str,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    results = await memory_manager.search(db, user_id, q)
+    results = await memory_manager.search(db, current_user.id, q)
     return [
         {"id": m.id, "content": m.content, "score": round(score, 3), "type": m.memory_type}
         for m, score in results
@@ -311,19 +351,19 @@ async def search_memory(
 @app.get("/api/profile")
 async def get_profile(
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    profile = await memory_manager.get_profile(db, user_id)
-    return profile or {"user_id": user_id}
+    profile = await memory_manager.get_profile(db, current_user.id)
+    return profile or {"user_id": current_user.id}
 
 
 @app.put("/api/profile")
 async def update_profile(
     updates: dict,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    await memory_manager.update_profile(db, user_id, updates)
+    await memory_manager.update_profile(db, current_user.id, updates)
     return {"status": "updated"}
 
 
@@ -333,13 +373,13 @@ async def update_profile(
 async def upload_document(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if file.size and file.size > settings.MAX_FILE_SIZE_MB * 1024 * 1024:
         raise HTTPException(400, f"File too large. Max {settings.MAX_FILE_SIZE_MB}MB.")
 
     content = await file.read()
-    doc = await document_processor.save_document(db, user_id, file.filename, content, ai_router)
+    doc = await document_processor.save_document(db, current_user.id, file.filename, content, ai_router)
 
     return {
         "id": doc.id,
@@ -354,9 +394,9 @@ async def upload_document(
 @app.get("/api/documents")
 async def list_documents(
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    docs = await document_processor.list_documents(db, user_id)
+    docs = await document_processor.list_documents(db, current_user.id)
     return [{"id": d.id, "filename": d.filename, "type": d.file_type, "summary": d.summary, "uploaded_at": d.uploaded_at.isoformat()} for d in docs]
 
 
@@ -365,9 +405,9 @@ async def ask_document(
     doc_id: str,
     question: str = Form(...),
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    answer = await document_processor.answer_from_document(db, doc_id, user_id, question, ai_router)
+    answer = await document_processor.answer_from_document(db, doc_id, current_user.id, question, ai_router)
     return {"answer": answer}
 
 
@@ -377,15 +417,19 @@ async def ask_document(
 async def run_agent(
     request: AgentRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
+    agent_type = request.effective_agent()
+    task = request.effective_task()
+
     result = await orchestrator.execute(
-        query=request.task,
-        user_id=user_id,
+        query=task,
+        user_id=current_user.id,
         db=db,
-        conversation_history=[],
-        agent_type=request.agent,
+        conversation_history=list(request.context.get("history", [])),
+        agent_type=agent_type,
         tools=["search_memory", "web_search"],
+        user_api_keys=current_user.api_keys or {},
     )
     return AgentResponse(
         agent=result["agent"],
@@ -399,9 +443,9 @@ async def run_agent(
 async def run_workflow(
     steps: list[dict],
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    results = await orchestrator.execute_workflow(steps, user_id, db)
+    results = await orchestrator.execute_workflow(steps, current_user.id, db)
     return {"steps": results}
 
 
@@ -411,7 +455,7 @@ async def run_workflow(
 async def search(
     request: SearchRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     results = []
 
@@ -420,14 +464,14 @@ async def search(
         results.extend([{"source": "web", **r} for r in web])
 
     if "memory" in request.sources:
-        memory_results = await memory_manager.search(db, user_id, request.query, request.max_results)
+        memory_results = await memory_manager.search(db, current_user.id, request.query, request.max_results)
         results.extend([
             {"source": "memory", "title": m.memory_type, "content": m.content, "relevance": round(s, 3)}
             for m, s in memory_results
         ])
 
     if "documents" in request.sources:
-        doc_text = await document_processor.search_documents(db, user_id, request.query)
+        doc_text = await document_processor.search_documents(db, current_user.id, request.query)
         if doc_text:
             results.append({"source": "documents", "title": "Document Match", "content": doc_text})
 
@@ -436,28 +480,32 @@ async def search(
 
 @app.post("/api/research")
 async def deep_research(
-    topic: str = Form(...),
+    request: ResearchRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    report = await search_engine.research_topic(topic, ai_router)
-    return {"topic": topic, "report": report}
+    report = await search_engine.research_topic(request.topic, ai_router)
+    return {"topic": request.topic, "report": report}
 
 
 @app.post("/api/analyze-url")
 async def analyze_url(
-    url: str = Form(...),
+    request: AnalyzeUrlRequest,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
-    content = await search_engine.analyze_url(url)
+    content = await search_engine.analyze_url(request.url)
     messages = [
         {"role": "system", "content": "Analyze this webpage content and provide key insights, main points, and a summary."},
-        {"role": "user", "content": f"URL: {url}\n\nContent:\n{content}"}
+        {"role": "user", "content": f"URL: {request.url}\n\nContent:\n{content}"}
     ]
     from ai.router import TaskComplexity
-    analysis, _ = await ai_router.complete(messages, complexity=TaskComplexity.SMART)
-    return {"url": url, "analysis": analysis}
+    analysis, _ = await ai_router.complete(
+        messages,
+        complexity=TaskComplexity.SMART,
+        user_api_keys=current_user.api_keys or {},
+    )
+    return {"url": request.url, "analysis": analysis}
 
 
 # ── Conversation history endpoints ─────────────────────────────────────────────
@@ -465,11 +513,11 @@ async def analyze_url(
 @app.get("/api/conversations")
 async def list_conversations(
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
         select(Conversation)
-        .where(Conversation.user_id == user_id)
+        .where(Conversation.user_id == current_user.id)
         .order_by(Conversation.updated_at.desc())
         .limit(50)
     )
@@ -481,10 +529,10 @@ async def list_conversations(
 async def get_conversation(
     conv_id: str,
     db: AsyncSession = Depends(get_db),
-    user_id: str = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     result = await db.execute(
-        select(Conversation).where(Conversation.id == conv_id, Conversation.user_id == user_id)
+        select(Conversation).where(Conversation.id == conv_id, Conversation.user_id == current_user.id)
     )
     conv = result.scalar_one_or_none()
     if not conv:
@@ -512,14 +560,19 @@ async def list_providers():
 
 @app.post("/api/auth/register", response_model=AuthResponse)
 async def register(request: AuthRequest, db: AsyncSession = Depends(get_db)):
-    # Check if username exists
-    result = await db.execute(select(User).where(User.username == request.username))
+    email = request.effective_email()
+    if not email:
+        raise HTTPException(400, "Email is required")
+
+    result = await db.execute(select(User).where(User.email == email))
     if result.scalar_one_or_none():
-        raise HTTPException(400, "Username already exists")
+        raise HTTPException(400, "Email already registered")
 
     user = User(
         id=str(uuid.uuid4()),
-        username=request.username,
+        username=email,
+        email=email,
+        name=request.name or email.split("@")[0],
         hashed_password=_hash_password(request.password),
     )
     db.add(user)
@@ -529,13 +582,19 @@ async def register(request: AuthRequest, db: AsyncSession = Depends(get_db)):
     return AuthResponse(
         access_token=token,
         user_id=user.id,
+        name=user.name,
+        email=user.email,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
 
 
 @app.post("/api/auth/login", response_model=AuthResponse)
 async def login(request: AuthRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.username == request.username))
+    email = request.effective_email()
+    if not email:
+        raise HTTPException(400, "Email is required")
+
+    result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not _verify_password(request.password, user.hashed_password):
         raise HTTPException(401, "Invalid credentials")
@@ -544,8 +603,99 @@ async def login(request: AuthRequest, db: AsyncSession = Depends(get_db)):
     return AuthResponse(
         access_token=token,
         user_id=user.id,
+        name=user.name,
+        email=user.email,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
+
+
+@app.get("/api/auth/me")
+async def get_me(current_user: User = Depends(get_current_user)):
+    return {
+        "user_id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "preferred_provider": current_user.preferred_provider,
+    }
+
+
+@app.post("/api/auth/google")
+async def google_auth(payload: dict, db: AsyncSession = Depends(get_db)):
+    """Google OAuth callback — accepts id_token from frontend."""
+    id_token = payload.get("id_token")
+    if not id_token:
+        raise HTTPException(400, "id_token required")
+
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+        info = google_id_token.verify_oauth2_token(id_token, google_requests.Request())
+        email = info["email"]
+        name = info.get("name", email.split("@")[0])
+    except Exception:
+        raise HTTPException(401, "Invalid Google token")
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        user = User(
+            id=str(uuid.uuid4()),
+            username=email,
+            email=email,
+            name=name,
+            hashed_password=_hash_password(str(uuid.uuid4())),
+        )
+        db.add(user)
+        await db.commit()
+
+    token = _create_token(user.id)
+    return AuthResponse(
+        access_token=token,
+        user_id=user.id,
+        name=user.name,
+        email=user.email,
+        expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+# ── User API key management ────────────────────────────────────────────────────
+
+@app.get("/api/user/keys")
+async def get_user_keys(current_user: User = Depends(get_current_user)):
+    keys = current_user.api_keys or {}
+    # Mask all but first/last 4 chars
+    masked = {}
+    for provider, key in keys.items():
+        if key and len(key) > 8:
+            masked[provider] = key[:4] + "****" + key[-4:]
+        else:
+            masked[provider] = "****" if key else ""
+    return {"keys": masked, "preferred_provider": current_user.preferred_provider}
+
+
+@app.put("/api/user/keys")
+async def save_user_keys(
+    payload: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    keys = payload.get("keys", {})
+    preferred_provider = payload.get("preferred_provider")
+
+    # Only update non-empty/non-masked values
+    existing = current_user.api_keys or {}
+    for provider in ["anthropic", "openai", "gemini"]:
+        val = keys.get(provider, "")
+        if val and "****" not in val:
+            existing[provider] = val
+        elif not val:
+            existing.pop(provider, None)
+
+    current_user.api_keys = existing
+    if preferred_provider:
+        current_user.preferred_provider = preferred_provider
+    await db.commit()
+    return {"status": "saved"}
 
 
 # ── Health & info ──────────────────────────────────────────────────────────────
