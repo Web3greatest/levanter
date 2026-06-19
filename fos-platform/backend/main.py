@@ -2,6 +2,8 @@
 FOS Platform — FastAPI Backend
 Unified AI assistant API with memory, agents, documents, voice, and search.
 """
+import asyncio
+import base64
 import json
 import uuid
 import os
@@ -61,6 +63,20 @@ security = HTTPBearer(auto_error=False)
 
 # In-memory session store (use Redis in production)
 active_sessions: dict[str, list[dict]] = {}
+
+
+# ── Auto-learning helper ───────────────────────────────────────────────────────
+
+async def _auto_learn(user_id: str, user_msg: str, ai_response: str):
+    """Extract and store insights from a conversation exchange into user memory.
+    Always creates its own DB session — never reuses the request session."""
+    try:
+        from database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            conversation = f"USER: {user_msg}\n\nASSISTANT: {ai_response}"
+            await memory_manager.extract_and_store(db, user_id, conversation, ai_router)
+    except Exception:
+        pass  # Learning failures are silent — never break the chat flow
 
 
 # ── Auth helpers ───────────────────────────────────────────────────────────────
@@ -168,6 +184,9 @@ async def chat(
     conv_id = request.conversation_id or str(uuid.uuid4())
     await _save_conversation(db, user_id, conv_id, history, result.get("model", "unknown"))
 
+    # Auto-learn: extract and store insights from this exchange in background
+    asyncio.create_task(_auto_learn(user_id, request.message, result["response"]))
+
     return ChatResponse(
         id=str(uuid.uuid4()),
         content=result["response"],
@@ -216,6 +235,9 @@ async def chat_stream(
         active_sessions[session_id] = history[-40:]
         conv_id = request.conversation_id or str(uuid.uuid4())
         await _save_conversation(db, user_id, conv_id, history, "streaming")
+
+        # Auto-learn from streaming exchange
+        asyncio.create_task(_auto_learn(user_id, request.message, full_response))
 
         yield f"data: {json.dumps({'type': 'done', 'session_id': session_id, 'conversation_id': conv_id})}\n\n"
 
@@ -381,6 +403,10 @@ async def upload_document(
     content = await file.read()
     doc = await document_processor.save_document(db, current_user.id, file.filename, content, ai_router)
 
+    # Store document summary in user knowledge memory for future AI context
+    if doc.summary:
+        asyncio.create_task(_store_doc_insight(current_user.id, doc.filename, doc.summary))
+
     return {
         "id": doc.id,
         "filename": doc.filename,
@@ -389,6 +415,23 @@ async def upload_document(
         "summary": doc.summary,
         "pages": doc.page_count,
     }
+
+
+async def _store_doc_insight(user_id: str, filename: str, summary: str):
+    """Persist document summary as a knowledge memory so AI can reference it in chat."""
+    try:
+        from database import AsyncSessionLocal
+        from models import MemoryType
+        async with AsyncSessionLocal() as db:
+            await memory_manager.add(
+                db, user_id,
+                content=f"[Document: {filename}] {summary}",
+                memory_type=MemoryType.KNOWLEDGE,
+                tags=["document", "upload"],
+                importance=0.8,
+            )
+    except Exception:
+        pass
 
 
 @app.get("/api/documents")
@@ -495,17 +538,80 @@ async def analyze_url(
     current_user: User = Depends(get_current_user),
 ):
     content = await search_engine.analyze_url(request.url)
-    messages = [
-        {"role": "system", "content": "Analyze this webpage content and provide key insights, main points, and a summary."},
-        {"role": "user", "content": f"URL: {request.url}\n\nContent:\n{content}"}
-    ]
+    from ai.prompts import build_system_prompt
     from ai.router import TaskComplexity
+    messages = [
+        {"role": "system", "content": build_system_prompt("research")},
+        {"role": "user", "content": f"Please analyze the following URL and its content thoroughly. Provide a comprehensive breakdown of what this page is about, who it's for, key claims and data points, strategic significance, and what action I should take based on this information.\n\nURL: {request.url}\n\nContent:\n{content[:8000]}"}
+    ]
     analysis, _ = await ai_router.complete(
         messages,
         complexity=TaskComplexity.SMART,
         user_api_keys=current_user.api_keys or {},
     )
+    # Store URL analysis insight in user's memory for future reference
+    asyncio.create_task(_store_url_insight(current_user.id, request.url, analysis))
     return {"url": request.url, "analysis": analysis}
+
+
+async def _store_url_insight(user_id: str, url: str, analysis: str):
+    """Persist URL analysis as a knowledge memory item (own DB session)."""
+    try:
+        from database import AsyncSessionLocal
+        from models import MemoryType
+        snippet = analysis[:500]
+        async with AsyncSessionLocal() as db:
+            await memory_manager.add(
+                db, user_id,
+                content=f"[URL Analysis] {url}\n\nKey insights: {snippet}",
+                memory_type=MemoryType.KNOWLEDGE,
+                tags=["url", "research", "web"],
+                importance=0.7,
+            )
+    except Exception:
+        pass
+
+
+@app.post("/api/analyze-image")
+async def analyze_image(
+    file: UploadFile = File(...),
+    prompt: str = Form(default="Analyze this image in detail. Describe what you see, extract any text or data, and provide business-relevant insights."),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Analyze an uploaded image using Claude Vision."""
+    import base64
+    content = await file.read()
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(400, "Image too large. Max 20MB.")
+
+    mime_map = {
+        "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "png": "image/png", "gif": "image/gif",
+        "webp": "image/webp",
+    }
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "jpeg"
+    mime_type = mime_map.get(ext, "image/jpeg")
+
+    image_b64 = base64.standard_b64encode(content).decode()
+
+    from ai.prompts import build_system_prompt
+    full_prompt = f"{build_system_prompt('vision')}\n\n{prompt}"
+    analysis = await ai_router.vision_complete(
+        image_data=image_b64,
+        mime_type=mime_type,
+        prompt=full_prompt,
+        user_api_keys=current_user.api_keys or {},
+    )
+
+    # Store image analysis in user memory
+    asyncio.create_task(_store_url_insight(
+        current_user.id,
+        f"[Image: {file.filename}]",
+        analysis,
+    ))
+
+    return {"filename": file.filename, "analysis": analysis}
 
 
 # ── Conversation history endpoints ─────────────────────────────────────────────

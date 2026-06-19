@@ -123,7 +123,7 @@ class AIRouter:
     # ── Anthropic ──────────────────────────────────────────────────────────────
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
-    async def _call_anthropic(self, messages: list[dict], model: str, max_tokens: int = 4096, api_key: Optional[str] = None) -> str:
+    async def _call_anthropic(self, messages: list[dict], model: str, max_tokens: int = 8192, api_key: Optional[str] = None) -> str:
         client = self._get_anthropic(api_key)
         if not client:
             raise ValueError("Anthropic API key not configured")
@@ -139,7 +139,27 @@ class AIRouter:
         )
         return response.content[0].text
 
-    async def _stream_anthropic(self, messages: list[dict], model: str, max_tokens: int = 4096, api_key: Optional[str] = None) -> AsyncIterator[str]:
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
+    async def _call_anthropic_vision(self, image_data: str, mime_type: str, prompt: str, model: str = None, api_key: Optional[str] = None) -> str:
+        """Analyze an image using Claude's vision capability."""
+        client = self._get_anthropic(api_key)
+        if not client:
+            raise ValueError("Anthropic API key not configured")
+        vision_model = model or settings.VISION_MODEL
+        response = await client.messages.create(
+            model=vision_model,
+            max_tokens=8192,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": mime_type, "data": image_data}},
+                    {"type": "text", "text": prompt},
+                ],
+            }],
+        )
+        return response.content[0].text
+
+    async def _stream_anthropic(self, messages: list[dict], model: str, max_tokens: int = 8192, api_key: Optional[str] = None) -> AsyncIterator[str]:
         client = self._get_anthropic(api_key)
         if not client:
             raise ValueError("Anthropic API key not configured")
@@ -250,7 +270,7 @@ class AIRouter:
         complexity: Optional[TaskComplexity] = None,
         provider: Optional[str] = None,
         model: Optional[str] = None,
-        max_tokens: int = 4096,
+        max_tokens: int = 8192,
         user_api_keys: Optional[dict] = None,
     ) -> tuple[str, str]:
         """Complete a conversation. Returns (response_text, model_used)."""
@@ -311,6 +331,19 @@ class AIRouter:
         else:
             text = await self._call_gemini(messages, selected_model)
             yield text
+
+    async def vision_complete(
+        self,
+        image_data: str,
+        mime_type: str,
+        prompt: str,
+        user_api_keys: Optional[dict] = None,
+    ) -> str:
+        """Analyze an image with Claude Vision. Returns description/analysis."""
+        keys = user_api_keys or {}
+        return await self._call_anthropic_vision(
+            image_data, mime_type, prompt, api_key=keys.get("anthropic")
+        )
 
     async def available_providers(self) -> dict[str, bool]:
         """Return which providers are configured."""
