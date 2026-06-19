@@ -17,7 +17,6 @@ anthropic==0.37.1
 google-generativeai==0.8.3
 
 # Vector / Memory
-sentence-transformers==3.1.1
 numpy==1.26.4
 scikit-learn==1.5.2
 
@@ -37,8 +36,8 @@ beautifulsoup4==4.12.3
 lxml==5.3.0
 tavily-python==0.5.0
 
-# Voice
-openai-whisper==20231117
+# Voice (optional — install separately: pip install openai-whisper gtts)
+# openai-whisper==20231117
 gtts==2.5.3
 
 # Utils
@@ -46,8 +45,8 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-dotenv==1.0.1
 aiofiles==24.1.0
-celery==5.4.0
-redis==5.1.1
+# celery==5.4.0
+# redis==5.1.1
 structlog==24.4.0
 tenacity==9.0.0
 tiktoken==0.8.0
