@@ -14,3 +14,4 @@ word.txt
 !.yarn/versions
 .cache
 config.json
+fos-platform/frontend/tsconfig.tsbuildinfo
